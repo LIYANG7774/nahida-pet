@@ -13,6 +13,9 @@ installer/build_dist/
 *.pkg
 *.toc
 
+# ---- 运行期生成的音量副本（会自动重建，不入库）----
+assets/sfx/_vol*/
+
 # ---- 调试截图与临时文件 ----
 tools/*.png
 tools/shots/
