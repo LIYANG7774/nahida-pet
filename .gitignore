@@ -1,0 +1,33 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 构建产物（体积大，不入库；用 GitHub Releases 分发 exe）----
+build/
+dist/
+installer/build/
+installer/build_dist/
+*.pkg
+*.toc
+
+# ---- 调试截图与临时文件 ----
+tools/*.png
+tools/shots/
+*.log
+
+# ---- 本机运行期数据（可能含 API Key，绝不入库）----
+.nahida_pet/
+config.json
+error.log
+
+# ---- 本机工作区数据（含本地路径日志）----
+.workbuddy/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
