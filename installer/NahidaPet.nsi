@@ -20,7 +20,7 @@ Unicode true
 ; ---------------- 产品信息 ----------------
 !define PRODUCT_NAME      "纳西妲桌宠"
 !define PRODUCT_NAME_EN   "Nahida Pet"
-!define PRODUCT_VERSION   "1.0.0"
+!define PRODUCT_VERSION   "1.0.1"
 !define PRODUCT_PUBLISHER "Nahida Desktop Pet"
 !define PRODUCT_EXE       "NahidaPet.exe"
 !define PRODUCT_README    "使用说明.txt"

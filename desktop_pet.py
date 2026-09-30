@@ -18,7 +18,7 @@ import random
 import sys
 import tkinter as tk
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps, ImageTk
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps, ImageTk
 
 import pet_config
 from pet_audio import Audio
@@ -35,7 +35,54 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = _res("assets")
 SFX = _res(os.path.join("assets", "sfx"))
 
-KEY = "magenta"  # 抠透明用的关键色（素材中不存在）
+KEY = "magenta"            # 抠透明用的关键色（素材中不存在）
+KEY_RGB = (255, 0, 255)    # 关键色的 RGB：背景像素必须与之"完全相等"，差一点都不透明
+
+# 边缘处理参数（关键色是硬色键，任何"和关键色混合过的像素"都会显形成粉紫描边）：
+_ALPHA_CUT = 96      # 比这个还淡的像素直接当全透明（裁掉原图的柔光/阴影晕圈）
+_ALPHA_FULL = 176    # 到这个透明度就是实心，中间做一段平滑过渡，避免锯齿
+
+
+def _extend_colors(img, rounds=3):
+    """把角色自身的颜色向外扩几圈，替换掉羽化区里"其实看不太出来"的颜色。
+
+    否则羽化像素会和关键色混成粉紫，在角色周围留下明显的紫色描边。
+    """
+    rgb = img.convert("RGB")
+    solid = img.getchannel("A").point(lambda v: 255 if v >= 200 else 0)
+    for _ in range(rounds):
+        grown_rgb = rgb.filter(ImageFilter.MaxFilter(3))
+        grown_solid = solid.filter(ImageFilter.MaxFilter(3))
+        newly = ImageChops.subtract(grown_solid, solid)     # 这一圈新扩出来的像素
+        rgb = Image.composite(grown_rgb, rgb, newly)
+        solid = grown_solid
+    return rgb
+
+
+def _composite_on_key(img):
+    """把 RGBA 帧叠到关键色底上，保证"该透明的地方"严格等于关键色。
+
+    这是透明能生效的前提：Tk 的 -transparentcolor 是精确色键，
+    背景像素但凡不是 (255,0,255)，整块背景就会显形。
+    """
+    span = max(1, _ALPHA_FULL - _ALPHA_CUT)
+    alpha = img.getchannel("A").point(
+        lambda v: 0 if v < _ALPHA_CUT else (255 if v >= _ALPHA_FULL
+                                            else int((v - _ALPHA_CUT) * 255 / span)))
+    bg = Image.new("RGB", img.size, KEY_RGB)
+    bg.paste(_extend_colors(img), (0, 0), alpha)
+    return bg
+
+
+def _gray_mix(img, amount):
+    """按 amount 混入灰度（去饱和），且保留原图 alpha。
+
+    坑：ImageOps.grayscale(img).convert("RGBA") 会把 alpha 全部变成 255，
+    与它 blend 之后整张图的背景都变成半透明 —— 色键失效、桌面露出一块洋红。
+    """
+    gray = ImageOps.grayscale(img).convert("RGBA")
+    gray.putalpha(img.getchannel("A"))
+    return Image.blend(img, gray, amount)
 
 # ---------------- 台词库 ----------------
 QUOTES = [
@@ -247,11 +294,11 @@ class Pet:
             img = self.src[key].copy()
         elif key == "sad":
             img = self.src["idle"].copy()
-            img = Image.blend(img, ImageOps.grayscale(img).convert("RGBA"), 0.45)
+            img = _gray_mix(img, 0.45)
             img = ImageEnhance.Brightness(img).enhance(0.9)
         elif key == "sleep":
             img = self.src["blink"].copy()
-            img = Image.blend(img, ImageOps.grayscale(img).convert("RGBA"), 0.25)
+            img = _gray_mix(img, 0.25)
             img = ImageEnhance.Brightness(img).enhance(0.72)
             img = img.rotate(-8, expand=True, resample=Image.BICUBIC)
         elif key == "hang":
@@ -294,10 +341,7 @@ class Pet:
         target = self.SIZES[self.size_name]
         ck = (key, target)
         if ck not in self.cache:
-            img = self._rgba(key).copy()
-            bg = Image.new("RGBA", img.size, (255, 0, 255, 255))
-            bg.alpha_composite(img)
-            self.cache[ck] = ImageTk.PhotoImage(bg)
+            self.cache[ck] = ImageTk.PhotoImage(_composite_on_key(self._rgba(key).copy()))
         return self.cache[ck]
 
     def _photo_fx(self, key):
@@ -308,15 +352,14 @@ class Pet:
         for p in self.particles:
             self._draw_particle(d, p)
         img.alpha_composite(overlay)
-        bg = Image.new("RGBA", img.size, (255, 0, 255, 255))
-        bg.alpha_composite(img)
-        return ImageTk.PhotoImage(bg)
+        return ImageTk.PhotoImage(_composite_on_key(img))
 
     @staticmethod
     def _draw_particle(d, p):
         x, y = p["x"], p["y"]
         life = p["life"] / max(1, p["max"])
-        a = int(255 * life)
+        # 只在最后 35% 的生命里淡出：半透明像素和关键色混合会露出洋红边
+        a = 255 if life > 0.35 else int(255 * (life / 0.35))
         kind = p["kind"]
         if kind == "heart":
             s = int(p["s"] * (0.6 + 0.4 * life))
@@ -379,6 +422,16 @@ class Pet:
         self.rgba.clear()
         ph = self._photo("idle")
         self.root.geometry(f"{ph.width()}x{ph.height()}")
+        self._assert_transparent()
+
+    def _assert_transparent(self):
+        """重申色键。窗口重建/重绘后色键偶尔会掉，掉了就会露出一整块洋红底。"""
+        try:
+            self.root.config(bg=KEY)
+            self.label.config(bg=KEY)
+            self.root.attributes("-transparentcolor", KEY)
+        except tk.TclError:
+            pass
 
     # ================= 动作 =================
     def _do(self, kind, dur_ms, **data):
@@ -726,6 +779,11 @@ class Pet:
 
     def _tick_frame(self):
         now = self._now()
+
+        # 每 5 秒重申一次色键（保险；正常情况下不会掉）
+        if now - getattr(self, "_key_check", 0) > 5000:
+            self._key_check = now
+            self._assert_transparent()
 
         # 状态超时回落
         if self.state in ("happy", "sad") and self.state_until and now >= self.state_until:

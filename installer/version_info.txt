@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         '080404B0',
         [StringStruct('CompanyName', 'Nahida Desktop Pet'),
          StringStruct('FileDescription', '纳西妲桌宠'),
-         StringStruct('FileVersion', '1.0.0.0'),
+         StringStruct('FileVersion', '1.0.1.0'),
          StringStruct('InternalName', 'NahidaPet'),
          StringStruct('LegalCopyright', '仅供个人学习交流使用'),
          StringStruct('OriginalFilename', 'NahidaPet.exe'),
          StringStruct('ProductName', '纳西妲桌宠 Nahida Pet'),
-         StringStruct('ProductVersion', '1.0.0.0')])
+         StringStruct('ProductVersion', '1.0.1.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [2052, 1200])])
   ]

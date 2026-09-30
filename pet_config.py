@@ -43,7 +43,7 @@ DEFAULTS = {
     "pet": {
         "size": "中",
         "auto_walk": True,
-        "sound_volume": 0.8,   # 0.0 ~ 1.0
+        "sound_volume": 0.7,   # 0.0 ~ 0.8（上限 0.8，再大就吵了）
     },
 }
 
@@ -68,9 +68,27 @@ def load():
     except Exception:
         data = {}
     cfg = _deep_merge(DEFAULTS, data)
+    cfg = _migrate(cfg, data)
     # 心情/饱食度沿用上次保存的值
     saved_state = (data.get("pet") or {}).get("_state") or {}
     _STATE.update({k: saved_state.get(k, v) for k, v in _STATE.items()})
+    return cfg
+
+
+# 已废弃的键：TTS 语音朗读整体下线后清掉，避免配置里堆垃圾
+_LEGACY_KEYS = ("tts", "tts_rate", "tts_voice", "speak_chat")
+
+
+def _migrate(cfg, raw):
+    """老配置兜底：清掉废弃键、把过大的音量收回到 0.8 以内（1.0 实在太吵）。"""
+    for k in _LEGACY_KEYS:
+        cfg.pop(k, None)
+    pet = cfg.setdefault("pet", {})
+    try:
+        vol = float(pet.get("sound_volume", 0.7))
+    except (TypeError, ValueError):
+        vol = 0.7
+    pet["sound_volume"] = max(0.0, min(0.8, vol))
     return cfg
 
 

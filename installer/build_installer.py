@@ -7,7 +7,7 @@
     python installer/build_installer.py --selftest   # 额外产出一个自检包（不写快捷方式/注册表）
 
 产物：
-    installer/dist/NahidaPet-Setup-1.0.0.exe
+    installer/dist/NahidaPet-Setup-<版本>.exe
 """
 from __future__ import annotations
 
@@ -71,6 +71,15 @@ def build_exe() -> None:
     print(f"      ok -> {PAYLOAD} ({os.path.getsize(PAYLOAD):,} bytes)")
 
 
+def product_version() -> str:
+    """从 .nsi 里读版本号，避免产物名和脚本里写的版本对不上。"""
+    with open(NSI, "r", encoding="utf-8") as f:
+        for line in f:
+            if "PRODUCT_VERSION" in line and '"' in line:
+                return line.split('"')[1]
+    return "0.0.0"
+
+
 def build_setup(selftest: bool = False) -> str:
     mk = find_makensis()
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -85,8 +94,17 @@ def build_setup(selftest: bool = False) -> str:
     if r.returncode != 0 or "Error in script" in out:
         print(out[-2500:])
         sys.exit("[x] 安装包编译失败。")
-    name = "_selftest-setup.exe" if selftest else "NahidaPet-Setup-1.0.0.exe"
+    ver = product_version()
+    name = "_selftest-setup.exe" if selftest else f"NahidaPet-Setup-{ver}.exe"
     out_file = os.path.join(OUT_DIR, name)
+    # 清掉旧版本产物，避免分发时拿错文件
+    for fn in os.listdir(OUT_DIR):
+        if fn.endswith(".exe") and fn != name:
+            try:
+                os.remove(os.path.join(OUT_DIR, fn))
+                print(f"      清理旧产物 {fn}")
+            except OSError:
+                pass
     print(f"      ok -> {out_file} ({os.path.getsize(out_file):,} bytes)")
     return out_file
 

@@ -2,7 +2,7 @@
 """安装包端到端自检：静默安装 -> 校验文件/快捷方式/注册表 -> 静默卸载 -> 校验清理。
 
 用法：
-    python tools/install_e2e_test.py installer/dist/NahidaPet-Setup-1.0.0.exe [安装目录]
+    python tools/install_e2e_test.py installer/dist/NahidaPet-Setup-<版本>.exe [安装目录]
 
 说明：
   · 会在当前用户下真实安装一次再卸载（可逆）。
@@ -27,6 +27,20 @@ STARTMENU_NAME = "纳西妲桌宠"
 
 
 # ---------------- 注册表小工具 ----------------
+def expected_version():
+    """从安装脚本里读版本号（别在测试里写死，否则一升级版本就误报失败）。"""
+    nsi = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "installer", "NahidaPet.nsi")
+    try:
+        with open(nsi, encoding="utf-8") as f:
+            for line in f:
+                if "PRODUCT_VERSION" in line and '"' in line:
+                    return line.split('"')[1]
+    except OSError:
+        pass
+    return None
+
+
 def reg_get(root, path, name):
     try:
         with winreg.OpenKey(root, path) as k:
@@ -118,7 +132,8 @@ def main() -> int:
     check("DisplayName", reg_get(winreg.HKEY_CURRENT_USER, UNINST_KEY, "DisplayName")
           == f"{STARTMENU_NAME} (Nahida Pet)",
           str(reg_get(winreg.HKEY_CURRENT_USER, UNINST_KEY, "DisplayName")))
-    check("DisplayVersion", reg_get(winreg.HKEY_CURRENT_USER, UNINST_KEY, "DisplayVersion") == "1.0.0")
+    ver = reg_get(winreg.HKEY_CURRENT_USER, UNINST_KEY, "DisplayVersion")
+    check("DisplayVersion", ver == expected_version(), f"{ver}（期望 {expected_version()}）")
     loc = reg_get(winreg.HKEY_CURRENT_USER, UNINST_KEY, "InstallLocation")
     check("InstallLocation 指向目标目录",
           os.path.normcase(loc or "") == os.path.normcase(target), str(loc))

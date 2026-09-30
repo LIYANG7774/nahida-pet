@@ -16,6 +16,7 @@ installer/build_dist/
 # ---- 调试截图与临时文件 ----
 tools/*.png
 tools/shots/
+tools/vshots/
 *.log
 
 # ---- 本机运行期数据（可能含 API Key，绝不入库）----
